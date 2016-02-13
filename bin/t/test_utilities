@@ -1,0 +1,48 @@
+#!/bin/sh
+
+export __DOTFILES_IS_TEST=true
+CURR_DIR="$(dirname "$0")"
+source "$CURR_DIR"/../install.sh
+
+
+it_will_return_an_os_type() {
+  os_type="$(os_type)"
+
+  assertNotNull "os_type() should return a non-zero length string" "$os_type"
+}
+
+
+#it_will_return_only_one_os_type() {
+#  is_osx
+#  osx_return=$?
+#
+#  is_linux
+#  linux_return=$?
+#
+#  if osx_return; then
+#    assertEqual "Script should not return true for is_linux and is_osx" 1 $linux_return
+#  else
+#    assertEqual "Script should not return true for is_linux and is_osx" 1 $osx_return
+#  fi
+#}
+
+
+##### Test Harness #####
+
+# suite() -- find and register tests to be run
+#   Derived from Gary Bernhardt's screencast #68
+#   (https://www.destroyallsoftware.com/screencasts/catalog/test-driving-shell-scripts)
+suite() {
+  local name tests
+  tests=$(grep ^it_ "$0" | cut -d '(' -f 1)
+  for name in $tests; do
+    suite_addTest "$name"
+  done
+}
+
+if hash shunit2 2>/dev/null; then
+  . shunit2
+else
+  echo 'Error: shunit2(1) could not be located. Please install it on your $PATH.' >&2
+  exit 1
+fi
