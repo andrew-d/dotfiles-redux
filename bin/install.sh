@@ -23,32 +23,32 @@ REPO_ROOT="$(cd -P -- "$CURRENT_DIR/../" && printf '%s\n' "$(pwd -P)")"
 
 log_trace() {
   [ $VERBOSITY -lt 5 ] && return
-  printf "\033[1;34m==>\033[0m  $@\n" >&2
+  printf "\033[1;34m==>\033[0m  %s\n" "$@" >&2
 }
 
 log_debug() {
   [ $VERBOSITY -lt 4 ] && return
-  printf "\033[1;34m==>\033[0m  $@\n" >&2
+  printf "\033[1;34m==>\033[0m  %s\n" "$@" >&2
 }
 
 log_info() {
   [ $VERBOSITY -lt 3 ] && return
-  printf "\033[1;32m==>\033[0m  $@\n" >&2
+  printf "\033[1;32m==>\033[0m  %s\n" "$@" >&2
 }
 
 log_info_sub() {
   [ $VERBOSITY -lt 3 ] && return
-  printf "\033[1;32m ->\033[0m  $@\n" >&2
+  printf "\033[1;32m ->\033[0m  %s\n" "$@" >&2
 }
 
 log_warn() {
   [ $VERBOSITY -lt 2 ] && return
-  printf "\033[1;33m==>\033[0m  $@\n" >&2
+  printf "\033[1;33m==>\033[0m  %s\n" "$@" >&2
 }
 
 log_error() {
   [ $VERBOSITY -lt 1 ] && return
-  printf "\033[1;31m==>\033[0m  $@\n" >&2
+  printf "\033[1;31m==>\033[0m  %s\n" "$@" >&2
 }
 
 log_crit() {
@@ -78,19 +78,17 @@ maybe_exit() {
 }
 
 assert() {
-  local lineno msg
+  local msg
 
-  if [ $# -lt 2 ]; then
+  if [ $# -lt 1 ]; then
     log_warn "Not enough parameters for assert()"
     return
   fi
 
-  lineno="$2"
-  msg="${3:-}"
+  msg="${2:-}"
 
-  if [ ! $1 ]; then
+  if [ ! "$1" ]; then
     log_error "Assertion failed: \"$1\""
-    log_error "File \"$0\", line $lineno"
     if [ -n "$msg" ]; then
       log_error "Message: $msg"
     fi
@@ -102,7 +100,7 @@ assert() {
 # OS detection.  Will exit if unknown.
 os_type() {
   local uname
-  uname=`uname -s | tr '[A-Z]' '[a-z]'`
+  uname="$(uname -s | tr '[:upper:]' '[:lower:]')"
 
   case $uname in
     darwin|linux)
@@ -116,17 +114,21 @@ os_type() {
 
 # Is this OS X?
 is_osx() {
-  [ os_type = "darwin" ] || return 1
+  local type
+  type="$(os_type)"
+  [ "$type" = "darwin" ] || return 1
 }
 
 # Is this Linux?
 is_linux() {
-  [ os_type = "linux" ] || return 1
+  local type
+  type="$(os_type)"
+  [ "$type" = "linux" ] || return 1
 }
 
 # Check if a given executable exists in our $PATH.
 has_executable() {
-  assert "$# -eq 1" $LINENO "Wrong number of arguments for has_executable()"
+  assert "$# -eq 1" "Wrong number of arguments for has_executable()"
 
   command -v "$1" 2>&1 >/dev/null || return 1
 }
@@ -138,18 +140,18 @@ is_restart() {
 
 # Truncate a string to a certain number of characters
 truncate() {
-  assert "$# -eq 2" $LINENO "Wrong number of arguments for truncate()"
+  assert "$# -eq 2" "Wrong number of arguments for truncate()"
 
   local s len
   s="$1"
   len="$2"
 
-  echo `echo "$s" | head -c $len`
+  echo "$s" | head -c "$len"
 }
 
 # Is a function with the given name declared?
 is_function_declared() {
-  assert "$# -eq 1" $LINENO "Wrong number of arguments for is_function_declared()"
+  assert "$# -eq 1" "Wrong number of arguments for is_function_declared()"
 
   if type "$1" | grep -q "shell function"; then
     return 0
@@ -160,7 +162,7 @@ is_function_declared() {
 
 # Backup a file to the backup directory
 backup_file() {
-  assert "$# -eq 1" $LINENO "Wrong number of arguments for backup_file()"
+  assert "$# -eq 1" "Wrong number of arguments for backup_file()"
 
   DID_BACKUP=1
 
@@ -176,7 +178,7 @@ backup_file() {
 
 # Backup the given file if it exists
 backup_file_if_exists() {
-  assert "$# -eq 1" $LINENO "Wrong number of arguments for backup_file_if_exists()"
+  assert "$# -eq 1" "Wrong number of arguments for backup_file_if_exists()"
 
   if [ ! -e "$1" ]; then
     return
@@ -187,7 +189,7 @@ backup_file_if_exists() {
 
 # Somewhat hackish, but portable, version of the `readlink` utility.
 readlink_portable() {
-  assert "$# -eq 1" $LINENO "Wrong number of arguments for readlink_portable()"
+  assert "$# -eq 1" "Wrong number of arguments for readlink_portable()"
 
   local link_name ls_output
 
@@ -198,7 +200,7 @@ readlink_portable() {
 
   # If we have the 'readlink' command, use it
   if has_executable "readlink"; then
-    echo "$(readlink -- "$link_name")"
+    readlink -- "$link_name"
   else
     ls_output="$(ls -dl -- "$link_name")"
     echo "${ls_output#*"${link_name} -> "}"
@@ -240,10 +242,10 @@ parse_flags() {
         maybe_exit
         ;;
       -v)
-        VERBOSITY=`expr $VERBOSITY + 1`
+        VERBOSITY="$( ($VERBOSITY + 1) )"
         ;;
       -q)
-        VERBOSITY=`expr $VERBOSITY - 1`
+        VERBOSITY="$( ($VERBOSITY - 1) )"
         ;;
       -b|--backup)
         BACKUP_DIR="$1"
@@ -298,9 +300,9 @@ _check_executables_linux() {
 check_repo_update() {
   local prev_head curr_head
 
-  prev_head=`git rev-parse HEAD`
+  prev_head="$(git rev-parse HEAD)"
   git pull
-  curr_head=`git rev-parse HEAD`
+  curr_head="$(git rev-parse HEAD)"
 
   if [ ! "$prev_head" = "$curr_head" ]; then
     log_warn "Changes detected, restarting script..."
@@ -311,7 +313,7 @@ check_repo_update() {
 
 # Runs a single step of our process
 run_step() {
-  assert "$# -eq 1" $LINENO "Wrong number of arguments for run_step()"
+  assert "$# -eq 1" "Wrong number of arguments for run_step()"
 
   local files base dest skip
 
@@ -422,7 +424,7 @@ main() {
   # Clone / update our dotfiles repository
   if [ ! -d "$DOTFILES" ]; then
     log_info "Dotfiles directory ($DOTFILES) does not exist. Cloning from GitHub..."
-    git clone $GITHUB_PATH $DOTFILES
+    git clone "$GITHUB_PATH" "$DOTFILES"
 
     cd "$DOTFILES"
   elif ! is_restart; then
@@ -436,6 +438,10 @@ main() {
   run_step "copy"
   run_step "link"
   run_step "init"
+
+  if [ "$DID_BACKUP" -eq 1 ]; then
+    log_info "Backups are stored in: $BACKUP_DIR"
+  fi
 
   log_info "Done!"
 }
