@@ -2,7 +2,7 @@
 
 export __DOTFILES_IS_TEST=true
 CURR_DIR="$(dirname "$0")"
-. "$CURR_DIR"/../install.sh
+. "$CURR_DIR"/../bin/install.sh
 
 
 setUp() {
