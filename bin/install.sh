@@ -1,12 +1,13 @@
 #!/bin/sh
 
-set -eu
+set -e
+set -u
 
 
 VERSION=0.0.1
 
 # Default configuration
-VERBOSITY=2
+VERBOSITY=3
 DOTFILES="$HOME"/.dotfiles
 GITHUB_PATH=git://github.com/andrew-d/dotfiles-redux.git
 BACKUP_DIR=
@@ -21,39 +22,92 @@ REPO_ROOT="$(cd -P -- "$CURRENT_DIR/../" && printf '%s\n' "$(pwd -P)")"
 ##################################################
 ## LOGGING
 
-log_trace() {
-  [ $VERBOSITY -lt 5 ] && return
-  printf "\033[1;34m==>\033[0m  %s\n" "$@" >&2
-}
+log() {
+  local message level ilevel color sindent
 
-log_debug() {
-  [ $VERBOSITY -lt 4 ] && return
-  printf "\033[1;34m==>\033[0m  %s\n" "$@" >&2
-}
+  message="$1"
+  level="${2:-debug}"
+  indent="${3:-0}"
 
-log_info() {
-  [ $VERBOSITY -lt 3 ] && return
-  printf "\033[1;32m==>\033[0m  %s\n" "$@" >&2
-}
+  # Map the input level string to a number
+  case $level in
+    trace)
+      ilevel=5
+      ;;
+    debug)
+      ilevel=4
+      ;;
+    info)
+      ilevel=3
+      ;;
+    warn)
+      ilevel=2
+      ;;
+    error)
+      ilevel=1
+      ;;
+    crit)
+      ilevel=0
+      ;;
+  esac
 
-log_info_sub() {
-  [ $VERBOSITY -lt 3 ] && return
-  printf "\033[1;32m ->\033[0m  %s\n" "$@" >&2
-}
+  # Don't log if the verbosity is lower, except for critical messages.
+  if [ ! "$ilevel" -eq "0" ]; then
+    if [ "$VERBOSITY" -lt "$ilevel" ]; then
+      return
+    fi
+  fi
 
-log_warn() {
-  [ $VERBOSITY -lt 2 ] && return
-  printf "\033[1;33m==>\033[0m  %s\n" "$@" >&2
-}
+  # Find the color for this message
+  case $ilevel in
+    5|4)
+      # Blue
+      color="\033[1;34m"
+      ;;
+    3)
+      # Green
+      color="\033[1;32m"
+      ;;
+    2)
+      # Yellow
+      color="\033[1;33m"
+      ;;
+    1|0)
+      # Red
+      color="\033[1;31m"
+      ;;
+    *)
+      # Magenta (unknown)
+      color="\033[1;35m"
+      ;;
+  esac
 
-log_error() {
-  [ $VERBOSITY -lt 1 ] && return
-  printf "\033[1;31m==>\033[0m  %s\n" "$@" >&2
-}
+  # Find the prefix arrow for 'indent'
+  case $indent in
+    0)
+      sindent="==>"
+      ;;
+    1)
+      sindent="  ->"
+      ;;
+    2)
+      sindent="   ->"
+      ;;
+    *)
+      # Unknown
+      sindent="??>"
+      ;;
+  esac
 
-log_crit() {
-  log_error "$@"
-  maybe_exit 1
+  # Log everything
+  printf "$color%s\033[0m  %s\n" \
+    "$sindent" \
+    "$message" >&2
+
+  # Maybe exit on critical messages
+  if [ "$ilevel" -eq "0" ]; then
+    maybe_exit 1
+  fi
 }
 
 
@@ -81,16 +135,16 @@ assert() {
   local msg
 
   if [ $# -lt 1 ]; then
-    log_warn "Not enough parameters for assert()"
+    log "Not enough parameters for assert()" "warn"
     return
   fi
 
   msg="${2:-}"
 
   if [ ! "$1" ]; then
-    log_error "Assertion failed: \"$1\""
+    log "Assertion failed: \"$1\"" "error"
     if [ -n "$msg" ]; then
-      log_error "Message: $msg"
+      log "Message: $msg" "error"
     fi
 
     maybe_exit 1
@@ -107,7 +161,7 @@ os_type() {
       echo "$uname"
       ;;
     *)
-      log_crit "Unknown system: $uname"
+      log "Unknown system: $uname" "crit"
       ;;
   esac
 }
@@ -172,7 +226,7 @@ backup_file() {
   fi
 
   # Move existing file there
-  log_info_sub "Backing up file: $1"
+  log "Backing up file: $1" "info" 1
   mv "$1" "$BACKUP_DIR/"
 }
 
@@ -330,17 +384,17 @@ parse_flags() {
         maybe_exit
         ;;
       -v)
-        (( VERBOSITY += 1 ))
+        VERBOSITY=$(( VERBOSITY + 1 ))
         ;;
       -q)
-        (( VERBOSITY -= 1 ))
+        VERBOSITY=$(( VERBOSITY - 1 ))
         ;;
       -b|--backup)
         BACKUP_DIR="$1"
         shift
         ;;
       *)
-        log_warn "Unknown option: $key"
+        log "Unknown option: $key" "warn"
         ;;
     esac
 
@@ -352,11 +406,11 @@ parse_flags() {
     BACKUP_DIR="$DOTFILES/backups/$(date "+%Y_%m_%d-%H_%M_%S")/"
   fi
 
-  log_trace "VERBOSITY   = $VERBOSITY"
-  log_trace "CURRENT_DIR = $CURRENT_DIR"
-  log_trace "REPO_ROOT   = $REPO_ROOT"
-  log_trace "DOTFILES    = $DOTFILES"
-  log_trace "BACKUP_DIR  = $BACKUP_DIR"
+  log "VERBOSITY   = $VERBOSITY" "trace"
+  log "CURRENT_DIR = $CURRENT_DIR" "trace"
+  log "REPO_ROOT   = $REPO_ROOT" "trace"
+  log "DOTFILES    = $DOTFILES" "trace"
+  log "BACKUP_DIR  = $BACKUP_DIR" "trace"
 }
 
 ##################################################
@@ -365,7 +419,7 @@ parse_flags() {
 check_executables() {
   # Common
   if ! has_executable "git"; then
-    log_crit "Git should be installed, but we couldn't find it.  Aborting."
+    log "Git should be installed, but we couldn't find it.  Aborting." "crit"
   fi
 
   if is_osx; then
@@ -377,12 +431,12 @@ check_executables() {
 
 _check_executables_osx() {
   if ! has_executable "gcc"; then
-    log_crit "XCode or the Command Line Tools for XCode must be installed first."
+    log "XCode or the Command Line Tools for XCode must be installed first." "crit"
   fi
 }
 
 _check_executables_linux() {
-  log_debug "No current executable checks on Linux"
+  log "No current executable checks on Linux" "debug"
 }
 
 check_repo_update() {
@@ -393,8 +447,8 @@ check_repo_update() {
   curr_head="$(git rev-parse HEAD)"
 
   if [ ! "$prev_head" = "$curr_head" ]; then
-    log_warn "Changes detected, restarting script..."
-    log_debug "Updated from $(truncate "$prev_head" 7) --> $(truncate "$curr_head" 7)"
+    log "Changes detected, restarting script..." "warn"
+    log "Updated from $(truncate "$prev_head" 7) --> $(truncate "$curr_head" 7)"
     exec env __DOTFILES_IS_RESTART=1 "$CANONICAL" "$@"
   fi
 }
@@ -410,10 +464,10 @@ run_step() {
   # Ignore the '*' file - if this happens, it means there are no files that
   # match this glob.
   if [ "$files" = "$DOTFILES/$1/*" ]; then
-    log_debug "No files found"
+    log "No files found"
     return
   else
-    log_trace "Files = $files"
+    log "Files = $files" "trace"
   fi
 
   # Run information function, if it exists.
@@ -425,7 +479,7 @@ run_step() {
     base="$(basename "$src")"
     dest="$HOME"/"$base"
 
-    log_trace "Processing file: $base"
+    log "Processing file: $base" "trace"
 
     # Skip files named '.gitkeep'
     if [ "$base" = ".gitkeep" ]; then
@@ -438,7 +492,7 @@ run_step() {
 
       # If the test function returns a string, then print it and skip.
       if [ "$skip" ]; then
-        log_info "Skipping $dest: $skip"
+        log "Skipping $dest: $skip" "info" 1
         continue
       fi
     fi
@@ -453,7 +507,7 @@ run_step() {
 
 # Copying
 copy_before() {
-  log_info "Copying files..."
+  log "Copying files..." "info"
 }
 
 copy_test() {
@@ -464,7 +518,7 @@ copy_test() {
       echo "same file"
       return
     else
-      log_debug "File exists but is different: $2"
+      log "File exists but is different: $2" "debug" 2
     fi
 
     # Get modification times
@@ -480,13 +534,13 @@ copy_test() {
 }
 
 copy_perform() {
-  log_info_sub "Copying $1 --> $2"
+  log "Copying $1 --> $2" "info" 1
   cp -a "$1" "$2"
 }
 
 # Linking
 link_before() {
-  log_info "Linking files..."
+  log "Linking files..." "info"
 }
 
 link_test() {
@@ -503,14 +557,14 @@ link_test() {
     if [ "$expected_target" = "$actual_target" ]; then
       echo 'link already exists'
     else
-      log_warn "Link '$2' exists, but points to: $actual_target"
-      log_debug "  Should point to: $expected_target"
+      log "Link '$2' exists, but points to: $actual_target" "warn" 1
+      log "Should point to: $expected_target" "debug" 1
     fi
   fi
 }
 
 link_perform() {
-  log_info_sub "Linking $1 --> $2"
+  log "Linking $1 --> $2" "info" 1
 
   # TODO(andrew-d): Make relative to $HOME?
   ln -sf "$1" "$2"
@@ -518,11 +572,11 @@ link_perform() {
 
 # Initialization
 init_before() {
-  log_info "Running initialization scripts..."
+  log "Running initialization scripts..." "info"
 }
 
 init_perform() {
-  log_debug "Would run $1"
+  log "Would run $1"
 }
 
 ##################################################
@@ -534,12 +588,12 @@ main() {
 
   # Clone / update our dotfiles repository
   if [ ! -d "$DOTFILES" ]; then
-    log_info "Dotfiles directory ($DOTFILES) does not exist. Cloning from GitHub..."
+    log "Dotfiles directory ($DOTFILES) does not exist. Cloning from GitHub..." "info"
     git clone "$GITHUB_PATH" "$DOTFILES"
 
     cd "$DOTFILES"
   elif ! is_restart; then
-    log_debug "Checking for an out-of-date repository"
+    log "Checking for an out-of-date repository"
 
     cd "$DOTFILES"
     check_repo_update "$@"
@@ -551,10 +605,10 @@ main() {
   run_step "init"
 
   if [ "$DID_BACKUP" -eq 1 ]; then
-    log_info "Backups are stored in: $BACKUP_DIR"
+    log "Backups are stored in: $BACKUP_DIR" "info"
   fi
 
-  log_info "Done!"
+  log "Done!" "info"
 }
 
 # Only run our main function if we're not testing
