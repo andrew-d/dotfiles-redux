@@ -2,13 +2,61 @@
 
 export __DOTFILES_IS_TEST=true
 CURR_DIR="$(dirname "$0")"
-source "$CURR_DIR"/../install.sh
+. "$CURR_DIR"/../install.sh
 
 
-it_will_return_an_os_type() {
+test_os_type() {
   os_type="$(os_type)"
 
   assertNotNull "os_type() should return a non-zero length string" "$os_type"
+}
+
+test_has_executable() {
+  has_executable "bash"
+  returnCode=$?
+  assertEquals "has_executable() should find bash" 0 $returnCode
+
+  has_executable "totally-not-a-real-executable"
+  returnCode=$?
+  assertEquals "has_executable() should not find a bogus executable" 1 $returnCode
+}
+
+test_truncate() {
+  s="$(truncate "foo bar baz" 3)"
+  assertEquals "truncate() should work (1)" "foo" "$s"
+
+  s="$(truncate "foo bar baz" 6)"
+  assertEquals "truncate() should work (2)" "foo ba" "$s"
+
+  s="$(truncate "foo bar baz" 999)"
+  assertEquals "truncate() should work (3)" "foo bar baz" "$s"
+}
+
+
+_dummy_function() {
+  echo 'foo'
+}
+
+test_is_function_declared() {
+  is_function_declared "_dummy_function"
+  returnCode=$?
+  assertEquals "is_function_declared() should return true for a function" 0 $returnCode
+
+  is_function_declared "command"
+  returnCode=$?
+  assertEquals "is_function_declared() should return false for a builtin" 1 $returnCode
+
+  is_function_declared "vi"
+  returnCode=$?
+  assertEquals "is_function_declared() should return false for a binary" 1 $returnCode
+}
+
+test_strlen() {
+  slen="$(strlen "foobar")"
+  assertEquals "strlen() should return the length of the string" 6 $slen
+
+  slen="$(strlen "")"
+  assertEquals "strlen() should handle empty strings" 0 $slen
 }
 
 
@@ -27,20 +75,7 @@ it_will_return_an_os_type() {
 #}
 
 
-##### Test Harness #####
-
-# suite() -- find and register tests to be run
-#   Derived from Gary Bernhardt's screencast #68
-#   (https://www.destroyallsoftware.com/screencasts/catalog/test-driving-shell-scripts)
-suite() {
-  local name tests
-  tests=$(grep ^it_ "$0" | cut -d '(' -f 1)
-  for name in $tests; do
-    suite_addTest "$name"
-  done
-}
-
-if hash shunit2 2>/dev/null; then
+if command -v shunit2 >/dev/null 2>&1; then
   . shunit2
 else
   echo 'Error: shunit2(1) could not be located. Please install it on your $PATH.' >&2

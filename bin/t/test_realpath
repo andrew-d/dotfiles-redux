@@ -1,0 +1,45 @@
+#!/bin/sh
+
+export __DOTFILES_IS_TEST=true
+CURR_DIR="$(dirname "$0")"
+. "$CURR_DIR"/../install.sh
+
+
+setUp() {
+  _test_previousdir="$PWD"
+  _test_workingdir="$(mktemp -d -t dotfiles.XXXXXX)"
+  cd -P -- "$_test_workingdir"
+
+  echo 'hello world' > foo
+  ln -s foo bar
+}
+
+tearDown() {
+  cd -- "$_test_previousdir"
+  rm -rf -- "$_test_workingdir"
+}
+
+test_realpath_portable() {
+  link_target="$(realpath_portable "bar")"
+
+  assertEquals "realpath_portable() should read the link's target" \
+    "$_test_workingdir/foo" \
+    "$link_target"
+}
+
+test_realpath_portable_no_binary() {
+  export __DOTFILES_TEST_NO_REALPATH=true
+  link_target="$(realpath_portable "bar")"
+
+  assertEquals "realpath_portable() should read the link's target" \
+    "$_test_workingdir/foo" \
+    "$link_target"
+}
+
+
+if command -v shunit2 >/dev/null 2>&1; then
+  . shunit2
+else
+  echo 'Error: shunit2(1) could not be located. Please install it on your $PATH.' >&2
+  exit 1
+fi

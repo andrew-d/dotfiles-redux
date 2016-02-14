@@ -130,7 +130,7 @@ is_linux() {
 has_executable() {
   assert "$# -eq 1" "Wrong number of arguments for has_executable()"
 
-  command -v "$1" 2>&1 >/dev/null || return 1
+  command -v "$1" >/dev/null 2>&1 || return 1
 }
 
 # Is this a restart?
@@ -153,7 +153,7 @@ truncate() {
 is_function_declared() {
   assert "$# -eq 1" "Wrong number of arguments for is_function_declared()"
 
-  if type "$1" | grep -q "shell function"; then
+  if type "$1" | grep -qi "function"; then
     return 0
   else
     return 1
@@ -191,15 +191,24 @@ backup_file_if_exists() {
 readlink_portable() {
   assert "$# -eq 1" "Wrong number of arguments for readlink_portable()"
 
-  local link_name ls_output
+  local link_name have_readlink ls_output
 
   link_name="$1"
   if [ ! -e "$link_name" ]; then
     return 1
   fi
 
+  # Find out if we have a readlink command.  We also allow turning this check
+  # off for testing.
+  have_readlink=no
+  if [ ! "${__DOTFILES_TEST_NO_READLINK:-false}" = "true" ]; then
+    if has_executable "readlink"; then
+      have_readlink=yes
+    fi
+  fi
+
   # If we have the 'readlink' command, use it
-  if has_executable "readlink"; then
+  if [ "$have_readlink" = "yes" ]; then
     readlink -- "$link_name"
   else
     ls_output="$(ls -dl -- "$link_name")"
@@ -207,8 +216,42 @@ readlink_portable() {
   fi
 }
 
-# Mimic the functionality of `readlink -f` on systems that don't have it.
+# Somewhat hackish, but portable, version of the `realpath` utility.
+realpath_portable() {
+  assert "$# -eq 1" "Wrong number of arguments for realpath_portable()"
 
+  local path readlink_out have_realpath
+
+  path="$1"
+  if [ ! -e "$path" ]; then
+    return 1
+  fi
+
+  # Find out if we have a realpath command.  We also allow turning this check
+  # off for testing.
+  have_realpath=no
+  if [ ! "${__DOTFILES_TEST_NO_REALPATH:-false}" = "true" ]; then
+    if has_executable "realpath"; then
+      have_realpath=yes
+    fi
+  fi
+
+  # Use `readlink` first
+  readlink_out="$(readlink_portable "$path")"
+
+  # If we have the 'realpath' command, use it
+  if [ "$have_realpath" = "yes" ]; then
+    realpath -e -- "$readlink_out"
+  else
+    cd -P -- "$(dirname -- "$readlink_out")"
+    printf '%s\n' "$(pwd -P)/$(basename -- "$readlink_out")"
+  fi
+}
+
+strlen() {
+  assert "$# -eq 1" "Wrong number of arguments for strlen()"
+  printf "$1" | wc -c
+}
 
 
 ##################################################
@@ -317,7 +360,7 @@ run_step() {
 
   local files base dest skip
 
-  files="$(find "$DOTFILES"/"$1" -type f -depth 1)"
+  files="$(find "$DOTFILES"/"$1" -depth 1 -type f)"
 
   # Ignore the '*' file - if this happens, it means there are no files that
   # match this glob.
@@ -401,8 +444,30 @@ link_before() {
   log_info "Linking files..."
 }
 
+link_test() {
+  local link_dest expected_dest
+
+  expected_dest="$(realpath_portable "$1")"
+
+  # If the destination is a link...
+  if [ -L "$2" ]; then
+    link_dest="$(realpath_portable "$2")"
+
+    # Only skip if it points to the right destination.
+    if [ "$link_dest" = "$expected_dest" ]; then
+      echo 'link already exists'
+    else
+      log_warn "Link '$2' exists, but points to: $link_dest"
+      log_debug "  Should point to: $expected_dest"
+    fi
+  fi
+}
+
 link_perform() {
-  log_debug "Would link $1 to $2"
+  log_info_sub "Linking $1 --> $2"
+
+  # TODO(andrew-d): Make relative to $HOME?
+  ln -sf "$1" "$2"
 }
 
 # Initialization
