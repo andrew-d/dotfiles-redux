@@ -1,11 +1,16 @@
 #!/bin/sh
 
+# Include our script first, to reduce incompatibilities
 export __DOTFILES_IS_TEST=true
 CURR_DIR="$(dirname "$0")"
 . "$CURR_DIR"/../bin/install.sh
 
 
-setUp() {
+# Tests start below
+# --------------------------------------------------
+describe "backup_file()"
+
+before() {
   _test_previousdir="$PWD"
   _test_workingdir="$(mktemp -d -t dotfiles.XXXXXX)"
   cd -P -- "$_test_workingdir"
@@ -13,66 +18,38 @@ setUp() {
   BACKUP_DIR="$_test_workingdir/backups"
 }
 
-tearDown() {
+after() {
   cd -- "$_test_previousdir"
   rm -rf -- "$_test_workingdir"
 }
 
-test_backup_file() {
+it_will_move_a_file_when_backing_up() {
   echo 'this is a file' > back_me_up.txt
   backup_file "back_me_up.txt"
 
-  if [ -e "back_me_up.txt" ]; then
-    fail 'backup_file() should have moved the file'
-  else
-    assertTrue ${SHUNIT_TRUE}
-  fi
-
-  if [ ! -e "$BACKUP_DIR/back_me_up.txt" ]; then
-    fail 'backup_file() should have moved to our backup dir'
-  else
-    assertTrue ${SHUNIT_TRUE}
-    assertEquals "backup_file() should keep original content" \
-      "this is a file" \
-      "$(cat "$BACKUP_DIR/back_me_up.txt")"
-  fi
-
-  assertEquals "backup_file() should set DID_BACKUP" 1 $DID_BACKUP
+  test '!' '-e' 'back_me_up.txt'
+  test "$DID_BACKUP" "-eq" "1"
 }
 
-test_backup_file_if_exists() {
-  echo 'this is another file' > back_me_up.txt
-  backup_file_if_exists "back_me_up.txt"
+it_will_move_to_the_backup_directory() {
+  echo 'this is a file' > back_me_up.txt
+  backup_file "back_me_up.txt"
 
-  if [ -e "back_me_up.txt" ]; then
-    fail 'backup_file_if_exists() should have moved the file'
-  else
-    assertTrue ${SHUNIT_TRUE}
-  fi
+  test '-e' "$BACKUP_DIR/back_me_up.txt"
+}
 
-  if [ ! -e "$BACKUP_DIR/back_me_up.txt" ]; then
-    fail 'backup_file_if_exists() should have moved to our backup dir'
-  else
-    assertTrue ${SHUNIT_TRUE}
-    assertEquals "backup_file_if_exists() should keep original content" \
-      "this is another file" \
-      "$(cat "$BACKUP_DIR/back_me_up.txt")"
-  fi
+it_will_preserve_file_contents() {
+  echo 'this is a file' > back_me_up.txt
+  backup_file "back_me_up.txt"
 
-  # File doesn't exist
+  contents="$(cat "$BACKUP_DIR/back_me_up.txt")"
+  test "$contents" "=" "this is a file"
+}
+
+it_will_ignore_nonexistant_files() {
   backup_file_if_exists "nonexistant.txt"
 
-  num_files=$(ls "$BACKUP_DIR" | wc -l)
-  assertEquals "backup_file_if_exists() should not create a file if not backing up" \
-    1 $num_files
-
-  assertEquals "backup_file_if_exists() should set DID_BACKUP" 1 $DID_BACKUP
+  # Ensure no files in the backup directory
+  num_files=$(ls "$BACKUP_DIR/" | wc -l)
+  test "$num_files" "-eq" 0
 }
-
-
-if command -v shunit2 >/dev/null 2>&1; then
-  . shunit2
-else
-  echo 'Error: shunit2(1) could not be located. Please install it on your $PATH.' >&2
-  exit 1
-fi

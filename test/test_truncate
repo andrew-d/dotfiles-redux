@@ -1,0 +1,26 @@
+#!/bin/sh
+
+# Include our script first, to reduce incompatibilities
+export __DOTFILES_IS_TEST=true
+CURR_DIR="$(dirname "$0")"
+. "$CURR_DIR"/../bin/install.sh
+
+
+# Tests start below
+# --------------------------------------------------
+describe "truncate()"
+
+it_will_truncate_a_string() {
+  s="$(truncate "foo bar baz" 3)"
+  test "$s" "=" "foo"
+}
+
+it_will_truncate_an_empty_string() {
+  s="$(truncate "" 3)"
+  test "-z" "$s"
+}
+
+it_will_truncate_a_short_string() {
+  s="$(truncate "asdf" 9999)"
+  test "$s" "=" "asdf"
+}

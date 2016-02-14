@@ -10,14 +10,11 @@ lint:
 	@printf "\033[1;32m==> Linting done\033[0m\n"
 
 .PHONY: unit-test
-unit-test: test/*
-
-test/%: force
-	@printf "\033[1;32m==> Running test: $@\033[0m\n"
-	@printf "\033[1;34m -> bash\033[0m\n"
-	@bash "$@"
-	@printf "\033[1;34m -> dash\033[0m\n"
-	@dash "$@"
+unit-test: test/test_*
+	@printf "\033[1;32m==> bash\033[0m\n"
+	@bash test/roundup $^
+	@printf "\033[1;32m==> dash\033[0m\n"
+	@dash test/roundup $^
 
 .PHONY: force
 force: ;

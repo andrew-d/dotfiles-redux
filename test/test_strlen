@@ -1,0 +1,21 @@
+#!/bin/sh
+
+# Include our script first, to reduce incompatibilities
+export __DOTFILES_IS_TEST=true
+CURR_DIR="$(dirname "$0")"
+. "$CURR_DIR"/../bin/install.sh
+
+
+# Tests start below
+# --------------------------------------------------
+describe "strlen()"
+
+it_will_return_the_length_of_the_string() {
+  slen="$(strlen "foobar")"
+  test "$slen" "-eq" 6
+}
+
+it_will_return_false_for_a_builtin() {
+  slen="$(strlen "")"
+  test "$slen" "-eq" 0
+}

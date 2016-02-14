@@ -1,11 +1,16 @@
 #!/bin/sh
 
+# Include our script first, to reduce incompatibilities
 export __DOTFILES_IS_TEST=true
 CURR_DIR="$(dirname "$0")"
 . "$CURR_DIR"/../bin/install.sh
 
 
-setUp() {
+# Tests start below
+# --------------------------------------------------
+describe "readlink()"
+
+before() {
   _test_previousdir="$PWD"
   _test_workingdir="$(mktemp -d -t dotfiles.XXXXXX)"
   cd -P -- "$_test_workingdir"
@@ -14,28 +19,19 @@ setUp() {
   ln -s foo bar
 }
 
-tearDown() {
+after() {
   cd -- "$_test_previousdir"
   rm -rf -- "$_test_workingdir"
 }
 
-test_readlink_portable() {
+it_will_read_a_link_target() {
   link_target="$(readlink_portable "bar")"
-  assertEquals "readlink_portable() should read the link's target" "foo" "$link_target"
+  test "$link_target" "=" "foo"
 }
 
-test_readlink_portable_no_binary() {
+it_will_read_a_link_target_with_no_binary() {
   export __DOTFILES_TEST_NO_READLINK=true
-
   link_target="$(readlink_portable "bar")"
-  assertEquals "readlink_portable() should read the link's target (no binary)" \
-    "foo" "$link_target"
+
+  test "$link_target" "=" "foo"
 }
-
-
-if command -v shunit2 >/dev/null 2>&1; then
-  . shunit2
-else
-  echo 'Error: shunit2(1) could not be located. Please install it on your $PATH.' >&2
-  exit 1
-fi

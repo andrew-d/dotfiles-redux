@@ -1,0 +1,35 @@
+#!/bin/sh
+
+# Include our script first, to reduce incompatibilities
+export __DOTFILES_IS_TEST=true
+CURR_DIR="$(dirname "$0")"
+. "$CURR_DIR"/../bin/install.sh
+
+
+# Tests start below
+# --------------------------------------------------
+describe "is_function_declared()"
+
+_dummy_function() {
+  echo 'foo'
+}
+
+it_will_find_a_dummy_function() {
+  declared="$(is_function_declared "_dummy_function" && echo "yes" || echo "no")"
+  test "$declared" "=" "yes"
+}
+
+it_will_return_false_for_a_builtin() {
+  declared="$(is_function_declared "command" && echo "yes" || echo "no")"
+  test "$declared" "=" "no"
+}
+
+it_will_return_false_for_a_binary() {
+  declared="$(is_function_declared "vi" && echo "yes" || echo "no")"
+  test "$declared" "=" "no"
+}
+
+it_will_return_false_for_a_nonexistant_function() {
+  declared="$(is_function_declared "totally_bogus" && echo "yes" || echo "no")"
+  test "$declared" "=" "no"
+}

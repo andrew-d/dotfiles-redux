@@ -1,0 +1,41 @@
+#!/bin/sh
+
+# Include our script first, to reduce incompatibilities
+export __DOTFILES_IS_TEST=true
+CURR_DIR="$(dirname "$0")"
+. "$CURR_DIR"/../bin/install.sh
+
+
+# Tests start below
+# --------------------------------------------------
+describe "os_type()"
+
+it_will_return_a_string() {
+  type="$(os_type)"
+  test "!" "-z" "$type"
+}
+
+it_will_only_return_one_os() {
+  osx_return="$(is_osx && echo "yes" || echo "no")"
+  linux_return="$(is_linux && echo "yes" || echo "no")"
+
+  if [ "$osx_return" = "yes" ]; then
+    test "$linux_return" "=" "no"
+  else
+    test "$linux_return" "=" "yes"
+    test "$osx_return" "=" "no"
+  fi
+}
+
+
+describe "has_executable()"
+
+it_will_find_an_existant_binary() {
+  has="$(has_executable "sh" && echo "yes" || echo "no")"
+  test "$has" "=" "yes"
+}
+
+it_will_not_find_a_fake_binary() {
+  has="$(has_executable "totally-not-a-real-executable" && echo "yes" || echo "no")"
+  test "$has" "=" "no"
+}
