@@ -216,43 +216,88 @@ readlink_portable() {
   fi
 }
 
-# Somewhat hackish, but portable, version of the `realpath` utility.
-realpath_portable() {
-  assert "$# -eq 1" "Wrong number of arguments for realpath_portable()"
-
-  local path readlink_out have_realpath
-
-  path="$1"
-  if [ ! -e "$path" ]; then
-    return 1
-  fi
-
-  # Find out if we have a realpath command.  We also allow turning this check
-  # off for testing.
-  have_realpath=no
-  if [ ! "${__DOTFILES_TEST_NO_REALPATH:-false}" = "true" ]; then
-    if has_executable "realpath"; then
-      have_realpath=yes
-    fi
-  fi
-
-  # Use `readlink` first
-  readlink_out="$(readlink_portable "$path")"
-
-  # If we have the 'realpath' command, use it
-  if [ "$have_realpath" = "yes" ]; then
-    realpath -e -- "$readlink_out"
-  else
-    cd -P -- "$(dirname -- "$readlink_out")"
-    printf '%s\n' "$(pwd -P)/$(basename -- "$readlink_out")"
-  fi
-}
-
 strlen() {
   assert "$# -eq 1" "Wrong number of arguments for strlen()"
   printf "$1" | wc -c
 }
 
+##################################################
+## REALPATH
+##
+## Note: this implementation was taken from here:
+##   https://github.com/mkropat/sh-realpath/blob/master/realpath.sh
+##
+## The following code (until the next '#'-marked
+## section) is under the following MIT license:
+##   https://github.com/mkropat/sh-realpath/blob/master/LICENSE.txt
+
+realpath() {
+    canonicalize_path "$(resolve_symlinks "$1")"
+}
+
+resolve_symlinks() {
+    _resolve_symlinks "$1"
+}
+
+_resolve_symlinks() {
+    _assert_no_path_cycles "$@" || return
+
+    local dir_context path
+    path=$(readlink -- "$1")
+    if [ $? -eq 0 ]; then
+        dir_context=$(dirname -- "$1")
+        _resolve_symlinks "$(_prepend_dir_context_if_necessary "$dir_context" "$path")" "$@"
+    else
+        printf '%s\n' "$1"
+    fi
+}
+
+_prepend_dir_context_if_necessary() {
+    if [ "$1" = . ]; then
+        printf '%s\n' "$2"
+    else
+        _prepend_path_if_relative "$1" "$2"
+    fi
+}
+
+_prepend_path_if_relative() {
+    case "$2" in
+        /* ) printf '%s\n' "$2" ;;
+         * ) printf '%s\n' "$1/$2" ;;
+    esac
+}
+
+_assert_no_path_cycles() {
+    local target path
+
+    target=$1
+    shift
+
+    for path in "$@"; do
+        if [ "$path" = "$target" ]; then
+            return 1
+        fi
+    done
+}
+
+canonicalize_path() {
+    if [ -d "$1" ]; then
+        _canonicalize_dir_path "$1"
+    else
+        _canonicalize_file_path "$1"
+    fi
+}
+
+_canonicalize_dir_path() {
+    (cd "$1" 2>/dev/null && pwd -P)
+}
+
+_canonicalize_file_path() {
+    local dir file
+    dir=$(dirname -- "$1")
+    file=$(basename -- "$1")
+    (cd "$dir" 2>/dev/null && printf '%s/%s\n' "$(pwd -P)" "$file")
+}
 
 ##################################################
 ## HELP AND FLAG-PARSING
@@ -285,10 +330,10 @@ parse_flags() {
         maybe_exit
         ;;
       -v)
-        VERBOSITY="$( ($VERBOSITY + 1) )"
+        (( VERBOSITY += 1 ))
         ;;
       -q)
-        VERBOSITY="$( ($VERBOSITY - 1) )"
+        (( VERBOSITY -= 1 ))
         ;;
       -b|--backup)
         BACKUP_DIR="$1"
@@ -360,7 +405,7 @@ run_step() {
 
   local files base dest skip
 
-  files="$(find "$DOTFILES"/"$1" -depth 1 -type f)"
+  files="$(find "$DOTFILES"/"$1" -maxdepth 1 -type f)"
 
   # Ignore the '*' file - if this happens, it means there are no files that
   # match this glob.
@@ -376,8 +421,8 @@ run_step() {
     "${1}_before"
   fi
 
-  for f in $files; do
-    base="$(basename "$f")"
+  for src in $files; do
+    base="$(basename "$src")"
     dest="$HOME"/"$base"
 
     log_trace "Processing file: $base"
@@ -389,11 +434,11 @@ run_step() {
 
     # If the test function is declared, run it.
     if is_function_declared "${1}_test"; then
-      skip="$("${1}_test" "$f" "$dest")"
+      skip="$("${1}_test" "$src" "$dest")"
 
-      # If the test function returns a string, then print and run it.
+      # If the test function returns a string, then print it and skip.
       if [ "$skip" ]; then
-        log_warn "Skipping $dest: $skip"
+        log_info "Skipping $dest: $skip"
         continue
       fi
     fi
@@ -402,7 +447,7 @@ run_step() {
     backup_file_if_exists "$dest"
 
     # Perform the operation.
-    "${1}_perform" "$f" "$dest"
+    "${1}_perform" "$src" "$dest"
   done
 }
 
@@ -445,20 +490,21 @@ link_before() {
 }
 
 link_test() {
-  local link_dest expected_dest
+  # Note: we get passed (src, dest), where 'src' is the file in our repo.
 
-  expected_dest="$(realpath_portable "$1")"
+  local expected_target actual_target
+  expected_target="$(realpath "$1")"
 
   # If the destination is a link...
   if [ -L "$2" ]; then
-    link_dest="$(realpath_portable "$2")"
+    actual_target="$(realpath "$2")"
 
     # Only skip if it points to the right destination.
-    if [ "$link_dest" = "$expected_dest" ]; then
+    if [ "$expected_target" = "$actual_target" ]; then
       echo 'link already exists'
     else
-      log_warn "Link '$2' exists, but points to: $link_dest"
-      log_debug "  Should point to: $expected_dest"
+      log_warn "Link '$2' exists, but points to: $actual_target"
+      log_debug "  Should point to: $expected_target"
     fi
   fi
 }
