@@ -8,6 +8,7 @@ readonly VERSION=0.0.1
 
 # Default configuration
 VERBOSITY=3
+CONFIRM=yes
 DOTFILES="$HOME"/.dotfiles
 GITHUB_PATH=git://github.com/andrew-d/dotfiles-redux.git
 BACKUP_DIR=
@@ -26,15 +27,12 @@ readonly REPO_ROOT="$(cd -P -- "$PROGDIR/../" && printf '%s\n' "$(pwd -P)")"
 ##################################################
 ## LOGGING
 
-log() {
-  local message level ilevel color sindent
+_log_level_to_num() {
+  local ilevel
 
-  message="$1"
-  level="${2:-debug}"
-  indent="${3:-0}"
+  assert "$# -eq 1" "Wrong number of arguments for _log_level_to_num()"
 
-  # Map the input level string to a number
-  case $level in
+  case $1 in
     trace)
       ilevel=5
       ;;
@@ -55,15 +53,15 @@ log() {
       ;;
   esac
 
-  # Don't log if the verbosity is lower, except for critical messages.
-  if [ ! "$ilevel" -eq "0" ]; then
-    if [ "$VERBOSITY" -lt "$ilevel" ]; then
-      return
-    fi
-  fi
+  echo "$ilevel"
+}
 
-  # Find the color for this message
-  case $ilevel in
+_log_color() {
+  local color
+
+  assert "$# -eq 1" "Wrong number of arguments for _log_color()"
+
+  case $1 in
     5|4)
       # Blue
       color="\033[1;34m"
@@ -86,22 +84,55 @@ log() {
       ;;
   esac
 
-  # Find the prefix arrow for 'indent'
-  case $indent in
+  echo "$color"
+}
+
+_log_arrow_prefix() {
+  local arrow
+
+  assert "$# -eq 1" "Wrong number of arguments for _log_arrow_prefix()"
+
+  case $1 in
     0)
-      sindent="==>"
+      prefix="==>"
       ;;
     1)
-      sindent="  ->"
+      prefix="  ->"
       ;;
     2)
-      sindent="   ->"
+      prefix="   ->"
       ;;
     *)
       # Unknown
-      sindent="??>"
+      prefix="??>"
       ;;
   esac
+
+  echo "$prefix"
+}
+
+log() {
+  local message level ilevel color sindent
+
+  message="$1"
+  level="${2:-debug}"
+  indent="${3:-0}"
+
+  # Map the input level string to a number
+  ilevel="$(_log_level_to_num "$level")"
+
+  # Don't log if the verbosity is lower, except for critical messages.
+  if [ ! "$ilevel" -eq "0" ]; then
+    if [ "$VERBOSITY" -lt "$ilevel" ]; then
+      return
+    fi
+  fi
+
+  # Find the color for this message
+  color="$(_log_color $ilevel)"
+
+  # Find the prefix arrow for 'indent'
+  sindent="$(_log_arrow_prefix $indent)"
 
   # Log everything
   printf "$color%s\033[0m  %s\n" \
@@ -335,6 +366,9 @@ parse_flags() {
         BACKUP_DIR="$1"
         shift
         ;;
+      -y)
+        CONFIRM=no
+        ;;
       *)
         log "Unknown option: $key" "warn"
         ;;
@@ -527,6 +561,21 @@ init_perform() {
 main() {
   parse_flags "$@"
   check_executables
+
+  # Ask for confirmation, but only if this isn't a restart.
+  if [ "$CONFIRM" = "yes" ] && ! is_restart; then
+    local confirm
+
+    printf "$(_log_color 3)$(_log_arrow_prefix 0)\033[0m  %s" \
+      "Do you want to update and install dotfiles (yes/no)? " >&2
+
+    read confirm
+
+    if [ ! "$confirm" = "yes" ]; then
+      log "Cancelled"
+      exit 0
+    fi
+  fi
 
   # Clone / update our dotfiles repository
   if [ ! -d "$DOTFILES" ]; then
