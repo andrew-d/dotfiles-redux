@@ -4,7 +4,7 @@ set -e
 set -u
 
 
-VERSION=0.0.1
+readonly VERSION=0.0.1
 
 # Default configuration
 VERBOSITY=3
@@ -14,10 +14,10 @@ BACKUP_DIR=
 DID_BACKUP=0
 
 # Derived variables
-CANONICAL="$(cd -P -- "$(dirname -- "$0")" && printf '%s\n' "$(pwd -P)/$(basename -- "$0")")"
-SCRIPT_NAME="$(basename "$CANONICAL")"
-CURRENT_DIR="$(dirname "$CANONICAL")"
-REPO_ROOT="$(cd -P -- "$CURRENT_DIR/../" && printf '%s\n' "$(pwd -P)")"
+readonly PROGPATH="$(cd -P -- "$(dirname -- "$0")" && printf '%s\n' "$(pwd -P)/$(basename -- "$0")")"
+readonly PROGNAME="$(basename "$PROGPATH")"
+readonly PROGDIR="$(dirname "$PROGPATH")"
+readonly REPO_ROOT="$(cd -P -- "$PROGDIR/../" && printf '%s\n' "$(pwd -P)")"
 
 ##################################################
 ## LOGGING
@@ -272,7 +272,7 @@ readlink_portable() {
 
 strlen() {
   assert "$# -eq 1" "Wrong number of arguments for strlen()"
-  printf "$1" | wc -c
+  printf '%s' "$1" | wc -c
 }
 
 join() {
@@ -373,7 +373,7 @@ _canonicalize_file_path() {
 
 usage() {
   cat <<HELP
-Usage: $SCRIPT_NAME
+Usage: $PROGNAME
 
 See the README for documentation.
 https://github.com/andrew-d/dotfiles
@@ -422,7 +422,7 @@ parse_flags() {
   fi
 
   log "VERBOSITY   = $VERBOSITY" "trace"
-  log "CURRENT_DIR = $CURRENT_DIR" "trace"
+  log "PROGDIR     = $PROGDIR" "trace"
   log "REPO_ROOT   = $REPO_ROOT" "trace"
   log "DOTFILES    = $DOTFILES" "trace"
   log "BACKUP_DIR  = $BACKUP_DIR" "trace"
@@ -464,7 +464,7 @@ check_repo_update() {
   if [ ! "$prev_head" = "$curr_head" ]; then
     log "Changes detected, restarting script..." "warn"
     log "Updated from $(truncate "$prev_head" 7) --> $(truncate "$curr_head" 7)"
-    exec env __DOTFILES_IS_RESTART=1 "$CANONICAL" "$@"
+    exec env __DOTFILES_IS_RESTART=1 "$PROGPATH" "$@"
   fi
 }
 
