@@ -275,6 +275,21 @@ strlen() {
   printf "$1" | wc -c
 }
 
+join() {
+  assert "$# -eq 2" "Wrong number of arguments for join()"
+
+  local arg sep
+
+  arg="$1"
+  sep="$2"
+
+  # In order:
+  #  - Remove blank lines
+  #  - Join with seperator
+  #  - Remove final (trailing) seperator
+  echo "$arg" | grep -v '^$' | awk "{ printf \"%s$sep\", \$0 }" | sed "s/$sep\$//"
+}
+
 ##################################################
 ## REALPATH
 ##
@@ -467,7 +482,7 @@ run_step() {
     log "No files found"
     return
   else
-    log "Files = $files" "trace"
+    log "Files = $(join "$files" ", ")" "trace"
   fi
 
   # Run information function, if it exists.
@@ -479,12 +494,12 @@ run_step() {
     base="$(basename "$src")"
     dest="$HOME"/"$base"
 
-    log "Processing file: $base" "trace"
-
     # Skip files named '.gitkeep'
     if [ "$base" = ".gitkeep" ]; then
       continue
     fi
+
+    log "Processing file: $base" "trace"
 
     # If the test function is declared, run it.
     if is_function_declared "${1}_test"; then
