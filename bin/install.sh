@@ -10,6 +10,7 @@ readonly VERSION=0.0.1
 VERBOSITY=3
 CONFIRM=yes
 DOTFILES="$HOME"/.dotfiles
+DRY_RUN=no
 GITHUB_PATH=git://github.com/andrew-d/dotfiles-redux.git
 BACKUP_DIR=
 DID_BACKUP=0
@@ -19,9 +20,6 @@ readonly PROGPATH="$(cd -P -- "$(dirname -- "$0")" && printf '%s\n' "$(pwd -P)/$
 readonly PROGNAME="$(basename "$PROGPATH")"
 readonly PROGDIR="$(dirname "$PROGPATH")"
 readonly REPO_ROOT="$(cd -P -- "$PROGDIR/../" && printf '%s\n' "$(pwd -P)")"
-
-# Require vendor libraries
-. "$PROGDIR/../vendor/sh-realpath/realpath.sh"
 
 
 ##################################################
@@ -325,6 +323,36 @@ join() {
   echo "$arg" | grep -v '^$' | awk "{ printf \"%s$sep\", \$0 }" | sed "s/$sep\$//"
 }
 
+# Compatible-ish version of 'realpath'
+realpath_portable() {
+  assert "$# -eq 2" "Wrong number of arguments for realpath_portable()"
+
+  local method
+  method="none"
+
+  if is_linux ; then
+    if has_executable "realpath"; then
+      method="bin"
+    elif has_executable "perl"; then
+      method="perl"
+    fi
+  elif is_osx ; then
+    method="perl"
+  fi
+
+  case $method in
+    bin)
+      realpath "$1"
+      ;;
+    perl)
+      perl -MCwd -le 'print Cwd::abs_path(shift)' "$1"
+      ;;
+    none)
+      log "Don't have any way of getting a real path!" "crit"
+      ;;
+  esac
+}
+
 
 ##################################################
 ## HELP AND FLAG-PARSING
@@ -368,6 +396,9 @@ parse_flags() {
         ;;
       -y)
         CONFIRM=no
+        ;;
+      -n)
+        DRY_RUN=yes
         ;;
       *)
         log "Unknown option: $key" "warn"
@@ -473,8 +504,10 @@ run_step() {
       fi
     fi
 
-    # If necessary, back up the destination file
-    backup_file_if_exists "$dest"
+    # If necessary, back up the destination file (if this isn't a dry run).
+    if [ "$DRY_RUN" = "no" ]; then
+      backup_file_if_exists "$dest"
+    fi
 
     # Perform the operation.
     "${1}_perform" "$src" "$dest"
@@ -511,7 +544,10 @@ copy_test() {
 
 copy_perform() {
   log "Copying $1 --> $2" "info" 1
-  cp -a "$1" "$2"
+
+  if [ "$DRY_RUN" = "no" ]; then
+    cp -a "$1" "$2"
+  fi
 }
 
 # Linking
@@ -520,14 +556,20 @@ link_before() {
 }
 
 link_test() {
-  # Note: we get passed (src, dest), where 'src' is the file in our repo.
+  # Note: we get passed (link_target, link_path), where 'link_target' is the
+  # file in our repo, and link_path is the location on-disk that there should
+  # be a symlink.  We want to check if `link_path` is already a link, and, if
+  # so, whether it points to our target.
+  local link_target link_path
+  link_target="$1"
+  link_path="$2"
 
   local expected_target actual_target
-  expected_target="$(realpath "$1")"
+  expected_target="$(realpath_portable "$link_target")"
 
-  # If the destination is a link...
-  if [ -L "$2" ]; then
-    actual_target="$(realpath "$2")"
+  # We only perform further checks if the link path is already a symlink.
+  if [ -L "$link_path" ]; then
+    actual_target="$(realpath_portable "$link_path")"
 
     # Only skip if it points to the right destination.
     if [ "$expected_target" = "$actual_target" ]; then
@@ -543,7 +585,9 @@ link_perform() {
   log "Linking $1 --> $2" "info" 1
 
   # TODO(andrew-d): Make relative to $HOME?
-  ln -sf "$1" "$2"
+  if [ "$DRY_RUN" = "no" ]; then
+    ln -sf "$1" "$2"
+  fi
 }
 
 # Initialization
@@ -553,6 +597,10 @@ init_before() {
 
 init_perform() {
   log "Would run $1"
+
+  if [ "$DRY_RUN" = "no" ]; then
+    : todo
+  fi
 }
 
 ##################################################
