@@ -225,9 +225,14 @@ def main():
 
     # We need to update the local tree as a final step, since we can't checkout
     # another branch (e.g. above) after we've modified the current one.
+    #
+    # TODO: we can't overwrite existing files - we should either skip them,
+    # error, or blow them away and start again.
     if options.update:
         for remote in config:
             path = remote['path']
+            if not path.endswith('/'):
+                path = path + '/'
 
             # The refspec is the same as branch_name...
             vendor_refspec = "vendor_" + remote['name'] + "_branch"
