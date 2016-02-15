@@ -4,9 +4,6 @@
 /link/.ssh/*.pem
 /link/.ssh/known_hosts
 
-# Don't commit Vim plugins, vim-plug will install them.
-/link/.vim/plugged
-
 # Don't commit rbenv temp files.
 /link/.rbenv/shims/
 /link/.rbenv/versions/
