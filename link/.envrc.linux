@@ -1,0 +1,13 @@
+#
+# EnvironmentRC - Linux
+#
+# This file contains environment variables that are not
+# shell-specific, but only apply to Linux.
+#
+#
+
+
+# TODO
+
+
+# vim: set filetype=sh:

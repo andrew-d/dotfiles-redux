@@ -1,0 +1,46 @@
+#
+# Aliases
+#
+# This file contains aliases that are not shell- or operating
+# system-specific.
+#
+#
+
+# Color for grep.
+alias grep='grep --color=auto'
+alias fgrep='fgrep --color=auto'
+alias egrep='egrep --color=auto'
+
+# If it exists, use source-highlight.
+if command -v "src-hilite-lesspipe.sh" >/dev/null 2>&1; then
+  export LESSOPEN="| $(which "src-hilite-lesspipe.sh") %s"
+fi
+
+# IP addresses
+alias wanip="dig +short myip.opendns.com @resolver1.opendns.com"
+alias whois="whois -h whois-servers.net"
+
+# File size
+alias df="df -h"
+
+# `ls` aliases
+alias ..='cd ..'
+alias ll='ls -alF'
+alias la='ls -A'
+alias l='ls -CF'
+
+# Tree should ignore some common directories.
+alias tree="tree -I node_modules --prune"
+
+# Bower should not be globbed
+alias bower="noglob bower"
+
+# ------------------------------------------------------------
+# If the OS-specific alias file exists, then we use it.
+_DOTFILES_LOCAL="$HOME/.aliases.$(uname -s | tr '[:upper:]' '[:lower:]')"
+if [ -f "$_DOTFILES_LOCAL" ]; then
+  . "$_DOTFILES_LOCAL"
+fi
+unset _DOTFILES_LOCAL
+
+# vim: set filetype=sh:

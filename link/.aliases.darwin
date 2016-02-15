@@ -1,0 +1,13 @@
+#
+# Aliases - Darwin
+#
+# This file contains aliases that are specific to Darwin (OS X).
+#
+#
+
+
+# Lock the screen
+alias lock="/System/Library/CoreServices/Menu\ Extras/User.menu/Contents/Resources/CGSession -suspend"
+
+
+# vim: set filetype=sh:

@@ -1,0 +1,13 @@
+#
+# Aliases - Darwin
+#
+# This file contains aliases that are specific to Darwin (OS X).
+#
+#
+
+
+# Enable color for ls
+alias ls='ls --color=auto'
+
+
+# vim: set filetype=sh:

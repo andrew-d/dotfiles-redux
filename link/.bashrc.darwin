@@ -1,0 +1,20 @@
+#
+# bashrc - Darwin
+#
+# This file contains configuration that is bash- and Darwin-specific.
+#
+#
+
+
+# Find chruby in a couple of locations
+for f in /usr/local/opt/chruby/share/chruby /usr/local/share/chruby; do
+  if [ -s "$f/chruby.sh" ]; then
+    . "$f/chruby.sh"
+    break
+  fi
+done
+
+# Try to find pythonz
+[[ -s $HOME/.pythonz/etc/bashrc ]] && . $HOME/.pythonz/etc/bashrc
+
+# vim: set filetype=sh:

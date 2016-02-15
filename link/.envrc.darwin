@@ -1,0 +1,23 @@
+#
+# EnvironmentRC - Darwin
+#
+# This file contains environment variables that are not
+# shell-specific, but only apply to Darwin (OS X).
+#
+#
+
+
+# Prefix our path with /usr/local so Homebrew works.
+export PATH=/usr/local/bin:/usr/local/sbin:$PATH
+
+# Append Postgres.app location to $PATH, if it exists.
+if [ -e /Applications/Postgres.app/Contents/MacOS/bin ]; then
+  export PATH="$PATH:/Applications/Postgres.app/Contents/MacOS/bin"
+fi
+
+# Configure colors
+export GREP_OPTIONS='--color=auto' GREP_COLOR='1;32'
+export LSCOLORS=ExGxFxDxCxHxHxCbCeEbEb
+
+
+# vim: set filetype=sh:
