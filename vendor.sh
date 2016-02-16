@@ -49,11 +49,10 @@ clone_and_copy() {
   repo_url="$1"
   dest="$2"
   rev="${3:-}"
-  ##tdir="$(mktemp -d)"
 
   # Figure out where we would store this in our cache directory.
   last_component="$(echo "$repo_url" | sed -E 's|^.*\/([^/]+)\.git$|\1|')"
-  repo_hash="$(echo "$repo" | shasum | cut -d' ' -f1)"
+  repo_hash="$(echo "$repo_url" | shasum | cut -d' ' -f1)"
   cache_dir="$CACHE_DIR/${last_component}-${repo_hash}"
 
   # Do the rest of the work in a subshell to avoid polluting our environment
@@ -62,7 +61,7 @@ clone_and_copy() {
     if [ -d "$cache_dir" ]; then
       cd "$cache_dir"
       msg3 "Cache directory exists - running 'git pull'"
-      maybe_run git pull || exit 1
+      maybe_run git -C "$cache_dir" pull || exit 1
     else
       msg3 "Cloning repo"
       maybe_run git clone "$repo_url" "$cache_dir" || exit 1
@@ -71,9 +70,7 @@ clone_and_copy() {
     # If we have a revision, check it out
     if [ ! -z "$rev" ]; then
       msg3 "Resetting to the given revision"
-      maybe_run cd repo
-      maybe_run git reset --hard "$rev" || ( err "Could not check out revision: $rev" ; exit 1 )
-      maybe_run cd ..
+      maybe_run git -C "$cache_dir" reset --hard "$rev" || ( err "Could not check out revision: $rev" ; exit 1 )
     fi
 
     # Copy all contents of the repo to the destination directory, except the '.git' directory
@@ -131,6 +128,7 @@ main() {
 
   msg "Updating vendored repos in $(pwd)..."
 
+  local line path repo ref
   while read -r line; do
     # Skip blank
     if echo "$line" | grep -q '^$' ; then
