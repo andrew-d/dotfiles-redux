@@ -4,6 +4,7 @@ set -u
 
 
 DRY_RUN=0
+FETCH=1
 VENDORFILE=vendor.ini
 CACHE_DIR=.vendor-cache
 
@@ -59,9 +60,12 @@ clone_and_copy() {
   (
     # If the cache directory exists, then we don't need to clone it.  We just 'git pull' instead.
     if [ -d "$cache_dir" ]; then
-      cd "$cache_dir"
-      msg3 "Cache directory exists - running 'git pull'"
-      maybe_run git -C "$cache_dir" pull || exit 1
+      if [ "$FETCH" -eq 1 ]; then
+        msg3 "Cache directory exists - running 'git fetch'"
+        maybe_run git -C "$cache_dir" fetch || exit 1
+      else
+        msg3 "Explicitly skipping fetch"
+      fi
     else
       msg3 "Cloning repo"
       maybe_run git clone "$repo_url" "$cache_dir" || exit 1
@@ -77,8 +81,6 @@ clone_and_copy() {
     msg3 "Copying to destination: $dest/"
     maybe_run rsync -av "$cache_dir/" "$dest/" --exclude=.git || exit 1
   )
-  ret=$?
-
   return $?
 }
 
@@ -89,6 +91,7 @@ Usage: $(basename "$0") [options]
 Options:
   -h or --help      Show this help
   -n                Dry-run mode (makes no changes)
+  --no-fetch        Don't run 'git fetch' in the repos upon update
 EOF
 }
 
@@ -103,6 +106,9 @@ parse_options() {
         ;;
       -n)
         DRY_RUN=1
+        ;;
+      --no-fetch)
+        FETCH=0
         ;;
       *)
         die "Unknown option: $key"
