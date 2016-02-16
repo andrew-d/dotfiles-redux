@@ -1,3 +1,6 @@
+# Vendor cache
+/.vendor-cache
+
 # Ignore anything potentially sensitive in .ssh
 /link/.ssh/authorized_keys
 /link/.ssh/id_*
