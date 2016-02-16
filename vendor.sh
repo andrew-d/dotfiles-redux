@@ -5,6 +5,7 @@ set -u
 
 DRY_RUN=0
 VENDORFILE=vendor.ini
+CACHE_DIR=.vendor-cache
 
 
 ##################################################
@@ -43,20 +44,29 @@ maybe_run() {
 }
 
 clone_and_copy() {
-  local repo_url dest tdir
+  local repo_url dest rev cache_dir
 
   repo_url="$1"
   dest="$2"
   rev="${3:-}"
-  tdir="$(mktemp -d)"
+  ##tdir="$(mktemp -d)"
+
+  # Figure out where we would store this in our cache directory.
+  last_component="$(echo "$repo_url" | sed -E 's|^.*\/([^/]+)\.git$|\1|')"
+  repo_hash="$(echo "$repo" | shasum | cut -d' ' -f1)"
+  cache_dir="$CACHE_DIR/${last_component}-${repo_hash}"
 
   # Do the rest of the work in a subshell to avoid polluting our environment
   (
-    cd "$tdir"
-
-    # Clone the repo
-    msg3 "Cloning repo"
-    maybe_run git clone "$repo_url" "repo" || exit 1
+    # If the cache directory exists, then we don't need to clone it.  We just 'git pull' instead.
+    if [ -d "$cache_dir" ]; then
+      cd "$cache_dir"
+      msg3 "Cache directory exists - running 'git pull'"
+      maybe_run git pull || exit 1
+    else
+      msg3 "Cloning repo"
+      maybe_run git clone "$repo_url" "$cache_dir" || exit 1
+    fi
 
     # If we have a revision, check it out
     if [ ! -z "$rev" ]; then
@@ -66,18 +76,12 @@ clone_and_copy() {
       maybe_run cd ..
     fi
 
-    # Remove the `.git` directory
-    msg3 "Removing .git"
-    maybe_run rm -rf repo/.git
-
-    # Copy all contents of the repo to the destination directory
+    # Copy all contents of the repo to the destination directory, except the '.git' directory
     msg3 "Copying to destination: $dest/"
-    maybe_run cp -a repo/. "$dest/" || exit 1
+    maybe_run rsync -av "$cache_dir/" "$dest/" --exclude=.git || exit 1
   )
   ret=$?
 
-  # Remove the temporary directory (always)
-  rm -rf "$tdir"
   return $?
 }
 
@@ -148,6 +152,12 @@ main() {
 
     # Prefix $path with the current path
     path="$(pwd -P)/$path"
+
+    # Repo must end with '.git' (currently)
+    if ! echo "$repo" | grep -q '\.git$' ; then
+      err "Repo does not end with '.git': $repo"
+      continue
+    fi
 
     msg "Processing: $repo"
 
