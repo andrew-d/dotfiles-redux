@@ -5,6 +5,9 @@ filetype plugin on                      " Enable loading plugin files
 filetype indent on                      " Enable loading indent files
 syntax on                               " Syntax highlighting on
 
+" Load plugins
+execute pathogen#infect()
+
 
 " =============================================================================
 " GENERAL SETTINGS
@@ -297,9 +300,6 @@ vnoremap <leader>b :let @* = expand("%") . ", line " . line(".")<cr>
 " =============================================================================
 " PLUGIN SETTINGS
 " -----------------------------------------------------------------------------
-
-" Load plugins
-execute pathogen#infect()
 
 " CtrlP: set the command and command name
 let g:ctrlp_map = '<c-p>'
