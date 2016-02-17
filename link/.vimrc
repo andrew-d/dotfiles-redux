@@ -78,7 +78,7 @@ autocmd BufRead,BufNewFile *.py match ExtraWhitespace /^\t\+/
 
 let g:solarized_termcolors=256          " Fixes solarized colors.
 set background=dark                     " Use a dark background
-colorscheme solarized                   " Use the solarized colorscheme
+colorscheme wombat256mod                " Use the wombat256mod colorscheme
 
 " Add json syntax highlighting
 autocmd BufNewFile,BufRead *.json set filetype=javascript
@@ -100,6 +100,56 @@ set listchars=precedes:◂,extends:▸
 
 " Use a Unicode character for wrapped lines.
 set showbreak=↪\ 
+
+" -----------------------------------------------------------------------------
+" Statusline / Tabline (subsection)
+" -----------------------------------------------------------------------------
+set title                               " Show file in titlebar
+set ruler                               " Enable the ruler
+set showcmd                             " Show incomplete command at bottom right.
+set showmode                            " Always show the paste mode in the status line
+
+" Set the ruler format.
+set rulerformat=%30(%=\:b%n%y%m%r%w\ %l,%c%V\ %P%)
+
+" Don't use the powerline symbols by default
+let g:airline_powerline_fonts=0
+
+" Airline configuration
+let g:airline_theme = "badwolf"
+let g:airline_left_sep = '▶'
+let g:airline_right_sep = '◀'
+let g:airline_symbols = get(g:, "airline_symbols", {})
+let g:airline_symbols.linenr = '¶'
+let g:airline_symbols.branch = '⎇'
+let g:airline_symbols.paste = 'ρ'
+let g:airline_symbols.whitespace = 'Ξ'
+
+
+let g:airline_detect_modified = 0
+function! ModifiedInit()
+    " EIGHT POINTED PINWHEEL STAR
+    call airline#parts#define_raw('modified', '%{&modified ? " ✵" : ""}')
+    call airline#parts#define_accent('modified', 'red')
+    let g:airline_section_c = airline#section#create(['%f', 'modified'])
+endfunction
+autocmd VimEnter * call ModifiedInit()
+
+" Set up our status line.
+if has('statusline')
+    set laststatus=2
+
+    " Broken down into easily includeable segments
+    set statusline=                             " Clear the statusline when we reload
+    set statusline+=[%n]\                       " Buffer number
+    set statusline+=%<%.99f\                    " Filename, truncated to 99 chars + 1 space
+    set statusline+=%h%w%m%r                    " Help/preview/modified/readonly flags
+    set statusline+=%{fugitive#statusline()}    " Git information
+    set statusline+=\ [%{&ff}/%Y]               " Filetype information
+    set statusline+=\ [%{getcwd()}]             " Current directory
+    "set statusline+=\ [A=\%03.3b/H=\%02.2B]     " ASCII / Hexadecimal value of char
+    set statusline+=%=%-14.(%l,%c%V%)\ %p%%     " Right aligned file nav info
+endif
 
 
 " =============================================================================
